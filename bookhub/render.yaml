@@ -2,12 +2,14 @@ services:
   - type: web
     name: bookhub-backend
     runtime: go
+    plan: free
+    region: singapore
+    rootDir: bookhub
     buildCommand: go build -o bookhub .
     startCommand: ./bookhub
+    autoDeployTrigger: commit
     envVars:
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: ALLOWED_ORIGINS
-        sync: false
