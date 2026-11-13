@@ -1,5 +1,8 @@
+
 -- BookHub PostgreSQL schema for Book Recommendation Dataset (Book-Crossing)
+
 BEGIN;
+
 CREATE TABLE IF NOT EXISTS books (
     isbn VARCHAR(20) PRIMARY KEY,
     title TEXT NOT NULL,
@@ -9,12 +12,23 @@ CREATE TABLE IF NOT EXISTS books (
     image_url_s TEXT,
     image_url_m TEXT,
     image_url_l TEXT,
+    description TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_books_title_lower ON books (lower(title));
-CREATE INDEX IF NOT EXISTS idx_books_author_lower ON books (lower(coalesce(author,'')));
-CREATE INDEX IF NOT EXISTS idx_books_publisher_lower ON books (lower(coalesce(publisher,'')));
+
+-- รองรับฐานข้อมูลเดิมที่สร้างตาราง books ไปก่อนแล้ว
+ALTER TABLE books
+ADD COLUMN IF NOT EXISTS description TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_books_title_lower
+ON books (lower(title));
+
+CREATE INDEX IF NOT EXISTS idx_books_author_lower
+ON books (lower(coalesce(author,'')));
+
+CREATE INDEX IF NOT EXISTS idx_books_publisher_lower
+ON books (lower(coalesce(publisher,'')));
 
 -- Preserve every source rating, including ISBNs absent from Books.csv.
 -- Rating 0 is an implicit interaction, not an explicit score; analytics exclude it.
@@ -24,24 +38,36 @@ CREATE TABLE IF NOT EXISTS dataset_ratings (
     isbn VARCHAR(20) NOT NULL,
     rating SMALLINT NOT NULL CHECK (rating BETWEEN 0 AND 10)
 );
-CREATE INDEX IF NOT EXISTS idx_dataset_ratings_isbn ON dataset_ratings (isbn);
-CREATE INDEX IF NOT EXISTS idx_dataset_ratings_user ON dataset_ratings (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_dataset_ratings_isbn
+ON dataset_ratings (isbn);
+
+CREATE INDEX IF NOT EXISTS idx_dataset_ratings_user
+ON dataset_ratings (user_id);
+
 CREATE OR REPLACE VIEW dataset_book_rating_stats AS
-SELECT isbn, count(*) FILTER (WHERE rating > 0) AS rating_count,
-       round(avg(rating) FILTER (WHERE rating > 0), 2) AS rating_average
-FROM dataset_ratings GROUP BY isbn;
+SELECT
+    isbn,
+    count(*) FILTER (WHERE rating > 0) AS rating_count,
+    round(avg(rating) FILTER (WHERE rating > 0), 2) AS rating_average
+FROM dataset_ratings
+GROUP BY isbn;
 
 CREATE TABLE IF NOT EXISTS members (
     id BIGSERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    display_name VARCHAR(50) NOT NULL CHECK (char_length(btrim(display_name)) >= 1),
+    display_name VARCHAR(50) NOT NULL
+        CHECK (char_length(btrim(display_name)) >= 1),
     avatar_url VARCHAR(500),
-    role VARCHAR(10) NOT NULL DEFAULT 'member' CHECK (role IN ('member','admin')),
+    role VARCHAR(10) NOT NULL DEFAULT 'member'
+        CHECK (role IN ('member','admin')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uq_members_email ON members (lower(email));
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_members_email
+ON members (lower(email));
 
 CREATE TABLE IF NOT EXISTS reviews (
     id BIGSERIAL PRIMARY KEY,
@@ -52,7 +78,9 @@ CREATE TABLE IF NOT EXISTS reviews (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (member_id, book_isbn)
 );
-CREATE INDEX IF NOT EXISTS idx_reviews_book_created ON reviews (book_isbn, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_book_created
+ON reviews (book_isbn, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS votes (
     member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
@@ -62,10 +90,17 @@ CREATE TABLE IF NOT EXISTS votes (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (member_id, book_isbn)
 );
-CREATE INDEX IF NOT EXISTS idx_votes_book ON votes (book_isbn);
+
+CREATE INDEX IF NOT EXISTS idx_votes_book
+ON votes (book_isbn);
+
 CREATE OR REPLACE VIEW book_vote_stats AS
-SELECT book_isbn, count(*) AS vote_count, round(avg(score),1) AS vote_average
-FROM votes GROUP BY book_isbn;
+SELECT
+    book_isbn,
+    count(*) AS vote_count,
+    round(avg(score),1) AS vote_average
+FROM votes
+GROUP BY book_isbn;
 
 CREATE TABLE IF NOT EXISTS wishlist_items (
     member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
@@ -74,5 +109,8 @@ CREATE TABLE IF NOT EXISTS wishlist_items (
     added_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (member_id, book_isbn)
 );
-CREATE INDEX IF NOT EXISTS idx_wishlist_member_added ON wishlist_items (member_id, added_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_wishlist_member_added
+ON wishlist_items (member_id, added_at DESC);
+
 COMMIT;

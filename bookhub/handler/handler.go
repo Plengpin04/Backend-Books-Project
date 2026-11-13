@@ -1,3 +1,4 @@
+
 package handler
 
 import (
@@ -45,19 +46,21 @@ func internal(w http.ResponseWriter, err error) {
 
 func pathID(r *http.Request, name string) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
-
 	return id, err == nil && id > 0
 }
 
 func pathISBN(r *http.Request) (string, bool) {
-	isbn := strings.TrimSpace(r.PathValue("isbn"))
-	isbn = strings.ToUpper(isbn)
+	isbn := strings.ToUpper(strings.TrimSpace(r.PathValue("isbn")))
 
-	if !validISBN(isbn) {
+	if !validBookID(isbn) {
 		return "", false
 	}
 
 	return isbn, true
+}
+
+func SearchBooks(w http.ResponseWriter, r *http.Request) {
+	// ใช้ผ่าน Handler ด้านล่าง
 }
 
 func (h *Handler) SearchBooks(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +87,7 @@ func (h *Handler) GetBook(w http.ResponseWriter, r *http.Request) {
 			w,
 			http.StatusBadRequest,
 			"BAD_ISBN",
-			"ISBN ไม่ถูกต้อง",
+			"รหัสหนังสือไม่ถูกต้อง",
 		)
 		return
 	}
@@ -106,12 +109,9 @@ func (h *Handler) GetBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ถ้า Supabase มีเรื่องย่อที่เราใส่ไว้เองแล้ว
-	// ให้ใช้ข้อมูลนั้นก่อน
 	if strings.TrimSpace(b.Description) != "" {
 		b.DescriptionSource = "Moony Books"
-	} else {
-		// ถ้ายังไม่มี ให้ลองค้นจาก API ภายนอก
+	} else if !strings.HasPrefix(isbn, "MOONY") {
 		description, source, sourceURL := lookupBookSynopsis(
 			r.Context(),
 			isbn,
@@ -133,7 +133,7 @@ func (h *Handler) ListReviews(w http.ResponseWriter, r *http.Request) {
 			w,
 			http.StatusBadRequest,
 			"BAD_ISBN",
-			"ISBN ไม่ถูกต้อง",
+			"รหัสหนังสือไม่ถูกต้อง",
 		)
 		return
 	}
