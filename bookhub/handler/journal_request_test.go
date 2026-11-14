@@ -9,9 +9,9 @@ import (
 
 func TestDecodeJournalRequestRequiresJSONObject(t *testing.T) {
 	tests := []struct {
-		name    string
-		body    string
-		wantOK  bool
+		name      string
+		body      string
+		wantOK    bool
 		wantTitle string
 	}{
 		{
