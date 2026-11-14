@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -39,9 +40,19 @@ func decodeJournalRequest(
 	r.Body = http.MaxBytesReader(w, r.Body, 2*1024*1024)
 
 	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
+
+	// Decode the first JSON value as raw data so that top-level null,
+	// arrays, strings, and numbers can be rejected before decoding into a struct.
+	var raw json.RawMessage
+	if err := decoder.Decode(&raw); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_JSON", "ข้อมูล JSON ไม่ถูกต้อง")
+		return req, false
+	}
+
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		writeError(w, http.StatusBadRequest, "BAD_JSON",
+			"ข้อมูลต้องเป็น JSON Object")
 		return req, false
 	}
 
@@ -51,6 +62,14 @@ func decodeJournalRequest(
 			"กรุณาส่ง JSON เพียงหนึ่งชุด")
 		return req, false
 	}
+
+	payloadDecoder := json.NewDecoder(bytes.NewReader(raw))
+	payloadDecoder.DisallowUnknownFields()
+	if err := payloadDecoder.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_JSON", "ข้อมูล JSON ไม่ถูกต้อง")
+		return req, false
+	}
+
 	return req, true
 }
 
