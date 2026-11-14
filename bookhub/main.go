@@ -19,13 +19,11 @@ import (
 
 func main() {
 	secret := os.Getenv("JWT_SECRET")
-
 	if len(secret) < 32 {
 		log.Fatal("JWT_SECRET must be at least 32 characters")
 	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
-
 	if databaseURL == "" {
 		log.Fatal("DATABASE_URL is required")
 	}
@@ -36,10 +34,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		10*time.Second,
-	)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := pool.Ping(ctx); err != nil {
@@ -59,7 +54,6 @@ func main() {
 	login := func(next http.HandlerFunc) http.HandlerFunc {
 		return mw.RequireLogin(tickets, next)
 	}
-
 	admin := func(next http.HandlerFunc) http.HandlerFunc {
 		return login(mw.RequireRole("admin", next))
 	}
@@ -76,17 +70,21 @@ func main() {
 
 	// Reviews
 	mux.HandleFunc("GET /api/books/{isbn}/reviews", h.ListReviews)
-	mux.HandleFunc(
-		"POST /api/books/{isbn}/reviews",
-		login(h.CreateReview),
-	)
+	mux.HandleFunc("POST /api/books/{isbn}/reviews", login(h.CreateReview))
 
-	// My Reading Journal
+	// My Reading Journal: Entries
 	mux.HandleFunc("GET /api/journal", login(h.ListJournalEntries))
 	mux.HandleFunc("POST /api/journal", login(h.CreateJournalEntry))
 	mux.HandleFunc("GET /api/journal/{id}", login(h.GetJournalEntry))
 	mux.HandleFunc("PUT /api/journal/{id}", login(h.UpdateJournalEntry))
 	mux.HandleFunc("DELETE /api/journal/{id}", login(h.DeleteJournalEntry))
+
+	// My Reading Journal: Settings
+	mux.HandleFunc("GET /api/journal/settings", login(h.GetJournalSettings))
+	mux.HandleFunc("PUT /api/journal/settings", login(h.UpdateJournalSettings))
+
+	// My Reading Journal: Built-in Stickers
+	mux.HandleFunc("GET /api/journal/stickers", login(h.GetJournalStickers))
 
 	// Admin
 	mux.HandleFunc("GET /api/admin/stats", admin(h.AdminStats))
@@ -97,10 +95,7 @@ func main() {
 	mux.HandleFunc("PUT /api/admin/books/{isbn}", admin(h.AdminUpdateBook))
 	mux.HandleFunc("DELETE /api/admin/books/{isbn}", admin(h.AdminDeleteBook))
 
-	origins := strings.Split(
-		os.Getenv("ALLOWED_ORIGINS"),
-		",",
-	)
+	origins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -108,11 +103,8 @@ func main() {
 	}
 
 	log.Println("BookHub API listening on :" + port)
-
-	log.Fatal(
-		http.ListenAndServe(
-			":"+port,
-			mw.Logging(mw.CORS(origins, mux)),
-		),
-	)
+	log.Fatal(http.ListenAndServe(
+		":"+port,
+		mw.Logging(mw.CORS(origins, mux)),
+	))
 }

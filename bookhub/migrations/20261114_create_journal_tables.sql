@@ -20,8 +20,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     content TEXT NOT NULL DEFAULT '',
     favorite_quote TEXT,
 
-    -- Stores sticker positions and decoration metadata.
-    -- Actual uploaded image files will be stored in Supabase Storage.
+    -- Built-in sticker positions and decoration metadata.
     decorations JSONB NOT NULL DEFAULT '[]'::jsonb
         CHECK (jsonb_typeof(decorations) = 'array'),
 
@@ -36,16 +35,27 @@ CREATE TABLE IF NOT EXISTS journal_settings (
     member_id BIGINT PRIMARY KEY
         REFERENCES members(id) ON DELETE CASCADE,
 
-    -- Theme, custom colors, paper style and other personal preferences.
+    -- Personal theme, colors, paper style and preferences.
     settings JSONB NOT NULL DEFAULT '{}'::jsonb
         CHECK (jsonb_typeof(settings) = 'object'),
 
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Keep the same RLS-enabled convention as the existing application tables.
--- The Go backend accesses these tables through its trusted database connection.
+-- Enable Row Level Security.
 ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_settings ENABLE ROW LEVEL SECURITY;
+
+-- The application accesses Journal through its trusted Go backend.
+-- Do not grant direct table access to Supabase API client roles.
+REVOKE ALL ON TABLE
+    journal_entries,
+    journal_settings
+FROM anon, authenticated;
+
+-- The identity sequence must not be directly accessible either.
+REVOKE ALL ON SEQUENCE
+    journal_entries_id_seq
+FROM anon, authenticated;
 
 COMMIT;
