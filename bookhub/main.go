@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -32,11 +31,9 @@ func main() {
 	}
 
 	pool, err := pgxpool.New(context.Background(), databaseURL)
-
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer pool.Close()
 
 	ctx, cancel := context.WithTimeout(
@@ -84,6 +81,13 @@ func main() {
 		login(h.CreateReview),
 	)
 
+	// My Reading Journal
+	mux.HandleFunc("GET /api/journal", login(h.ListJournalEntries))
+	mux.HandleFunc("POST /api/journal", login(h.CreateJournalEntry))
+	mux.HandleFunc("GET /api/journal/{id}", login(h.GetJournalEntry))
+	mux.HandleFunc("PUT /api/journal/{id}", login(h.UpdateJournalEntry))
+	mux.HandleFunc("DELETE /api/journal/{id}", login(h.DeleteJournalEntry))
+
 	// Admin
 	mux.HandleFunc("GET /api/admin/stats", admin(h.AdminStats))
 	mux.HandleFunc("GET /api/admin/members", admin(h.AdminMembers))
@@ -99,7 +103,6 @@ func main() {
 	)
 
 	port := os.Getenv("PORT")
-
 	if port == "" {
 		port = "8080"
 	}
